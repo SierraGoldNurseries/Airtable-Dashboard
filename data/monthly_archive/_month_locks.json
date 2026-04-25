@@ -1,0 +1,79 @@
+{
+  "locked_months": {
+    "2025-01": {
+      "filename": "SG_2025-01.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 57
+    },
+    "2025-02": {
+      "filename": "SG_2025-02.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 71
+    },
+    "2025-03": {
+      "filename": "SG_2025-03.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 122
+    },
+    "2025-04": {
+      "filename": "SG_2025-04.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 122
+    },
+    "2025-05": {
+      "filename": "SG_2025-05.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 126
+    },
+    "2025-06": {
+      "filename": "SG_2025-06.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 126
+    },
+    "2025-07": {
+      "filename": "SG_2025-07.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 141
+    },
+    "2025-08": {
+      "filename": "SG_2025-08.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 109
+    },
+    "2025-09": {
+      "filename": "SG_2025-09.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 107
+    },
+    "2025-10": {
+      "filename": "SG_2025-10.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 136
+    },
+    "2025-11": {
+      "filename": "SG_2025-11.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 112
+    },
+    "2025-12": {
+      "filename": "SG_2025-12.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 95
+    },
+    "2026-01": {
+      "filename": "SG_2026-01.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 90
+    },
+    "2026-02": {
+      "filename": "SG_2026-02.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 103
+    },
+    "2026-03": {
+      "filename": "SG_2026-03.csv",
+      "locked_at": "2026-04-25 05:05:44 UTC",
+      "row_count_when_locked": 119
+    }
+  }
+}
