@@ -290,6 +290,7 @@ const charts = {};
 let allRows = [];
 let latestMeta = {};
 let rawDebugRows = [];
+let mergedCsvLastModified = null;
 
 const fmt = (n, d = 1) => Number(n || 0).toLocaleString(undefined, {
   maximumFractionDigits: d,
@@ -465,9 +466,7 @@ function parseCsv(text) {
 function normalizeRow(row, sourceName) {
   const map = normalizeKeyMap(row);
 
-  const date = parseDateFlexible(getAny(map, [
-    "date"
-  ]));
+  const date = parseDateFlexible(getAny(map, ["date"]));
 
   const robot = clean(getAny(map, [
     "robot",
@@ -552,28 +551,42 @@ function dedupeRows(rows) {
 }
 
 async function fetchTextNoCache(url) {
-  const res = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" });
-  if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
-  return await res.text();
+  const res = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {
+    cache: "no-store"
+  });
+
+  if (!res.ok) {
+    throw new Error("HTTP " + res.status + " for " + url);
+  }
+
+  return {
+    text: await res.text(),
+    lastModified: res.headers.get("Last-Modified") || null
+  };
 }
 
 async function fetchJsonNoCache(url) {
-  const text = await fetchTextNoCache(url);
-  return JSON.parse(text || "{}");
+  const result = await fetchTextNoCache(url);
+  return JSON.parse(result.text || "{}");
 }
 
 async function fetchFirstAvailable(urls) {
   let lastError = null;
+
   for (const url of urls) {
     try {
+      const result = await fetchTextNoCache(url);
+
       return {
         url,
-        text: await fetchTextNoCache(url)
+        text: result.text,
+        lastModified: result.lastModified
       };
     } catch (err) {
       lastError = err;
     }
   }
+
   throw lastError || new Error("No available file");
 }
 
@@ -599,6 +612,18 @@ function formatPacific(value) {
     second: "2-digit",
     timeZoneName: "short"
   }).format(date);
+}
+
+function getDataUpdatedTimestamp() {
+  return (
+    latestMeta.data_updated_at ||
+    latestMeta.last_success ||
+    latestMeta.last_change_at ||
+    latestMeta.csv_last_modified ||
+    latestMeta.merged_last_modified ||
+    mergedCsvLastModified ||
+    ""
+  );
 }
 
 function uniqueSorted(arr) {
@@ -821,8 +846,8 @@ function renderDashboard() {
     ? allSummary.rangeStart + " to " + allSummary.rangeEnd
     : "—";
 
-  const last = latestMeta.last_success || latestMeta.last_updated || latestMeta.last_change_at || latestMeta.generated_at || "";
-  els.lastUpdated.textContent = last ? formatPacific(last) : "—";
+  const dataUpdated = getDataUpdatedTimestamp();
+  els.lastUpdated.textContent = dataUpdated ? formatPacific(dataUpdated) : "—";
 
   const byDate = Array.from(groupBy(rows, r => r.Date).entries()).sort((a, b) => a[0].localeCompare(b[0]));
   const dailyLabels = byDate.map(([d]) => d);
@@ -952,8 +977,10 @@ async function loadData() {
     }
 
     try {
-      const mergedText = await fetchTextNoCache(DATA_FILES.merged);
-      const parsed = parseCsv(mergedText);
+      const mergedResult = await fetchTextNoCache(DATA_FILES.merged);
+      mergedCsvLastModified = mergedResult.lastModified;
+
+      const parsed = parseCsv(mergedResult.text);
       mergedRows = normalizeRows(parsed, "merged");
     } catch (err) {
       console.warn("Merged CSV not loaded:", err);
@@ -990,6 +1017,7 @@ async function loadData() {
 function openDebug() {
   const rows = rawDebugRows || [];
   const headers = rows.length ? Object.keys(rows[0]) : [];
+  const dataUpdated = getDataUpdatedTimestamp();
 
   const w = window.open("", "_blank", "width=1400,height=850");
   if (!w) return;
@@ -1013,11 +1041,13 @@ function openDebug() {
     '</style></head><body>' +
     '<div class="panel">' +
     '<h2>Debug CSV Table</h2>' +
-    '<div class="small">Last Updated: <b>' + (latestMeta.last_success ? formatPacific(latestMeta.last_success) : "—") + '</b></div>' +
+    '<div class="small">Last Updated: <b>' + (dataUpdated ? formatPacific(dataUpdated) : "—") + '</b></div>' +
     '<div class="small">Data range: <b>' + (summary.rangeStart || "—") + ' to ' + (summary.rangeEnd || "—") + '</b></div>' +
     '<div class="small">Dashboard rows after merge: <b>' + rows.length + '</b></div>' +
     '<div class="small">History source checked: <span class="code">data/SG_2024_Metrics.csv</span></div>' +
     '<div class="small">Merged source checked: <span class="code">data/SG_Merged.csv</span></div>' +
+    '<div class="small">Merged CSV Last-Modified header: <span class="code">' + (mergedCsvLastModified || "—") + '</span></div>' +
+    '<div class="small">State last_success: <span class="code">' + (latestMeta.last_success || "—") + '</span></div>' +
     '</div>' +
     '<div class="panel"><table><thead><tr>' +
     headers.map(h => "<th>" + h + "</th>").join("") +
