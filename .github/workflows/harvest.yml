@@ -2,16 +2,23 @@ name: Harvest Airtable CSV
 
 on:
   schedule:
-    # Runs hourly during the possible UTC windows.
-    # The Python script should enforce Pacific local times:
-    # 6 AM, 10 AM, and 2 PM, with PST/PDT handled automatically.
+    # GitHub cron runs in UTC.
+    # This broad window lets the Python script enforce the exact Pacific times:
+    # Monday-Friday at 6 AM, 10 AM, and 2 PM Pacific, with PST/PDT handled by the script.
     - cron: "0 13-22 * * 1-5"
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
   pages: write
   id-token: write
+
+concurrency:
+  group: sg-dashboard-harvest
+  cancel-in-progress: false
 
 jobs:
   harvest:
