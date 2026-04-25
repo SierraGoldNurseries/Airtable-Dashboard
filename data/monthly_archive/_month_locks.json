@@ -1,5 +1,30 @@
 {
   "locked_months": {
+    "2024-08": {
+      "filename": "SG_2024-08.csv",
+      "locked_at": "2026-04-25 05:50:15 UTC",
+      "row_count_when_locked": 43
+    },
+    "2024-09": {
+      "filename": "SG_2024-09.csv",
+      "locked_at": "2026-04-25 05:50:15 UTC",
+      "row_count_when_locked": 57
+    },
+    "2024-10": {
+      "filename": "SG_2024-10.csv",
+      "locked_at": "2026-04-25 05:50:15 UTC",
+      "row_count_when_locked": 61
+    },
+    "2024-11": {
+      "filename": "SG_2024-11.csv",
+      "locked_at": "2026-04-25 05:50:15 UTC",
+      "row_count_when_locked": 51
+    },
+    "2024-12": {
+      "filename": "SG_2024-12.csv",
+      "locked_at": "2026-04-25 05:50:15 UTC",
+      "row_count_when_locked": 45
+    },
     "2025-01": {
       "filename": "SG_2025-01.csv",
       "locked_at": "2026-04-25 05:05:44 UTC",
