@@ -1,15 +1,6 @@
 name: Harvest Airtable CSV
 
 on:
-  push:
-    branches:
-      - main
-
-  schedule:
-    # GitHub cron runs in UTC.
-    # Testing mode: runs every 10 minutes, every day including weekends.
-    - cron: "3,13,23,33,43,53 * * * *"
-
   workflow_dispatch:
 
 env:
