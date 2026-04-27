@@ -8,13 +8,13 @@ on:
   schedule:
     # GitHub cron runs in UTC.
     # Testing mode: runs every 10 minutes, every day including weekends.
-    # Uses offset minutes to avoid busy exact :00/:10/:20 marks.
     - cron: "3,13,23,33,43,53 * * * *"
 
   workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  AIRTABLE_SHARED_URL: ${{ secrets.AIRTABLE_SHARED_URL }}
 
 permissions:
   contents: write
@@ -53,6 +53,15 @@ jobs:
           echo ""
           echo "Data folder:"
           ls -la data || true
+
+      - name: Confirm Airtable URL secret exists
+        run: |
+          if [ -z "$AIRTABLE_SHARED_URL" ]; then
+            echo "AIRTABLE_SHARED_URL is missing or empty"
+            exit 1
+          else
+            echo "AIRTABLE_SHARED_URL is set"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
