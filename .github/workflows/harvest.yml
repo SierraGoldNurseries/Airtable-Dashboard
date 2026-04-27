@@ -1,11 +1,15 @@
 name: Harvest Airtable CSV
 
 on:
+  push:
+    branches:
+      - main
+
   schedule:
     # GitHub cron runs in UTC.
-    # Testing mode: wakes up every 10 minutes, every day including weekends.
-    # Your Python script should still skip if data was already harvested.
-    - cron: "*/10 * * * *"
+    # Testing mode: runs every 10 minutes, every day including weekends.
+    # Using 3,13,23,33,43,53 avoids the busy exact :00/:10/:20 marks.
+    - cron: "3,13,23,33,43,53 * * * *"
 
   workflow_dispatch:
 
@@ -26,6 +30,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Show trigger info
+        run: |
+          echo "Workflow triggered"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "UTC time:"
+          date -u
+          echo "Runner local time:"
+          date
+
       - name: Check out repo
         uses: actions/checkout@v4
 
@@ -56,6 +70,7 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changes detected."
+            git status --short
           fi
 
       - name: Commit updated data
