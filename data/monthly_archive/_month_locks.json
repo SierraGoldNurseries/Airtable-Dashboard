@@ -99,6 +99,11 @@
       "filename": "SG_2026-03.csv",
       "locked_at": "2026-04-25 05:05:44 UTC",
       "row_count_when_locked": 119
+    },
+    "2026-04": {
+      "filename": "SG_2026-04.csv",
+      "locked_at": "2026-05-01 01:01:43 UTC",
+      "row_count_when_locked": 155
     }
   }
 }
