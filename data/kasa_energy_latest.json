@@ -1,5 +1,5 @@
 {
-  "timestamp_iso": "2026-05-15T16:27:42",
+  "timestamp_iso": "2026-05-15T16:47:42",
   "pc_host": "SGN-00008",
   "totals": {
     "today_kwh": 0.0,
@@ -8,7 +8,7 @@
   },
   "devices": [
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8431",
       "ip": "192.168.6.194",
@@ -28,7 +28,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8432",
       "ip": "192.168.6.188",
@@ -48,7 +48,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8433",
       "ip": "192.168.6.144",
@@ -68,7 +68,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8472",
       "ip": "192.168.6.157",
@@ -88,7 +88,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8475",
       "ip": "192.168.6.61",
@@ -108,7 +108,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8480",
       "ip": "192.168.6.114",
@@ -128,7 +128,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8631",
       "ip": "192.168.6.97",
@@ -148,7 +148,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "8632",
       "ip": "192.168.6.132",
@@ -168,7 +168,7 @@
       "mac": ""
     },
     {
-      "timestamp_iso": "2026-05-15T16:27:42",
+      "timestamp_iso": "2026-05-15T16:47:42",
       "pc_host": "SGN-00008",
       "device_name": "DEVICE_9",
       "ip": "192.168.6.140",
