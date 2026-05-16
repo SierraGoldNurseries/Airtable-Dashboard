@@ -1,25 +1,19 @@
 name: Harvest Airtable CSV
-
 on:
   workflow_dispatch:
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   AIRTABLE_SHARED_URL: ${{ secrets.AIRTABLE_SHARED_URL }}
-
 permissions:
   contents: write
   pages: write
   id-token: write
-
 concurrency:
   group: sg-dashboard-harvest
   cancel-in-progress: false
-
 jobs:
   harvest:
     runs-on: ubuntu-latest
-
     steps:
       - name: Show trigger info
         run: |
@@ -30,10 +24,10 @@ jobs:
           date -u
           echo "Runner local time:"
           date
-
       - name: Check out repo
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Show repo files
         run: |
           echo "Repo root files:"
@@ -44,7 +38,6 @@ jobs:
           echo ""
           echo "Data folder:"
           ls -la data || true
-
       - name: Confirm Airtable URL secret exists
         run: |
           if [ -z "$AIRTABLE_SHARED_URL" ]; then
@@ -53,12 +46,10 @@ jobs:
           else
             echo "AIRTABLE_SHARED_URL is set"
           fi
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
@@ -67,15 +58,12 @@ jobs:
           else
             pip install pandas playwright beautifulsoup4 requests pytz
           fi
-
       - name: Install Playwright browser
         run: |
           python -m playwright install chromium
-
       - name: Harvest Airtable CSV
         run: |
           python scripts/harvest_airtable.py
-
       - name: Check for changes
         id: changes
         run: |
@@ -87,26 +75,44 @@ jobs:
             echo "Changes detected:"
             git status --short
           fi
-
       - name: Commit updated data
         if: steps.changes.outputs.changed == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+          git config pull.rebase true
           git add .
           git commit -m "Update Airtable harvest"
-          git push
-
+          # Retry push up to 5 times. If remote has new commits (e.g. local Kasa
+          # collector pushed during this run), pull --rebase then retry.
+          PUSHED=0
+          for i in 1 2 3 4 5; do
+            if git push; then
+              echo "Push succeeded on attempt $i"
+              PUSHED=1
+              break
+            fi
+            echo "Push attempt $i failed. Fetching and rebasing on origin/${{ github.ref_name }}..."
+            git fetch origin "${{ github.ref_name }}"
+            if ! git rebase "origin/${{ github.ref_name }}"; then
+              echo "Rebase had conflicts. Aborting rebase and retrying with merge..."
+              git rebase --abort || true
+              git pull --no-rebase --strategy-option=theirs origin "${{ github.ref_name }}" || true
+            fi
+            sleep 2
+          done
+          if [ "$PUSHED" -ne 1 ]; then
+            echo "ERROR: Could not push after 5 attempts."
+            exit 1
+          fi
       - name: Setup Pages
         if: steps.changes.outputs.changed == 'true'
         uses: actions/configure-pages@v5
-
       - name: Upload Pages artifact
         if: steps.changes.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: "."
-
       - name: Deploy to GitHub Pages
         if: steps.changes.outputs.changed == 'true'
         uses: actions/deploy-pages@v4
