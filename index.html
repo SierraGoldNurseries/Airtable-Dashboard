@@ -1309,7 +1309,21 @@ function openDebug() {
     '<div class="panel"><table><thead><tr>' +
     headers.map(h => "<th>" + h + "</th>").join("") +
     '</tr></thead><tbody>' + table + '</tbody></table></div>' +
-    '
+    '</body></html>'
+  );
+
+  w.document.close();
+}
+
+els.rangePreset.addEventListener("change", () => renderDashboard());
+els.dateFrom.addEventListener("change", () => renderDashboard());
+els.dateTo.addEventListener("change", () => renderDashboard());
+els.debugBtn.addEventListener("click", () => openDebug());
+els.reloadBtn.addEventListener("click", () => loadData());
+
+loadData();
+</script>
+
 
 <script>
 /* ============================================================
@@ -1595,19 +1609,5 @@ setInterval(() => {
 }, 60000);
 </script>
 
-</body></html>'
-  );
-
-  w.document.close();
-}
-
-els.rangePreset.addEventListener("change", () => renderDashboard());
-els.dateFrom.addEventListener("change", () => renderDashboard());
-els.dateTo.addEventListener("change", () => renderDashboard());
-els.debugBtn.addEventListener("click", () => openDebug());
-els.reloadBtn.addEventListener("click", () => loadData());
-
-loadData();
-</script>
 </body>
 </html>
