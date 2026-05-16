@@ -527,30 +527,30 @@ th{
   <div id="tab-monthly" class="tab-panel">
     <div class="panel">
       <div class="status">
-        <span>Combined view across robots and plugs</span>
-        <span>Miles &amp; motion: <strong id="monthlyRowsRobots">—</strong> rows</span>
-        <span>Energy: <strong id="monthlyRowsKasa">—</strong> rows</span>
+        <span>Individual unit monthly view</span>
+        <span>Robot rows: <strong id="monthlyRowsRobots">—</strong></span>
+        <span>Energy rows: <strong id="monthlyRowsKasa">—</strong></span>
       </div>
-    </div>
-
-    <div class="panel chart-card full-width">
-      <h3 style="margin:0 0 8px">Monthly totals: units, utilization, miles, motion</h3>
-      <canvas id="monthlyTotalsChart"></canvas>
     </div>
 
     <div class="charts3">
       <div class="panel chart-card">
-        <h3>Monthly miles</h3>
+        <h3>Monthly miles by unit</h3>
         <canvas id="monthlyMilesChart"></canvas>
       </div>
       <div class="panel chart-card">
-        <h3>Monthly motion hours</h3>
+        <h3>Monthly motion hours by unit</h3>
         <canvas id="monthlyMotionChart"></canvas>
       </div>
     </div>
 
     <div class="panel chart-card full-width">
-      <h3 style="margin:0 0 8px">Monthly kWh by plug (stacked) + total</h3>
+      <h3 style="margin:0 0 8px">Monthly utilization % by unit</h3>
+      <canvas id="monthlyUtilByUnitChart"></canvas>
+    </div>
+
+    <div class="panel chart-card full-width">
+      <h3 style="margin:0 0 8px">Monthly kWh by plug (individual plugs stacked) + total</h3>
       <canvas id="monthlyKwhChart"></canvas>
     </div>
   </div><!-- /tab-monthly -->
@@ -1644,26 +1644,33 @@ setInterval(() => {
 }, 60000);
 
 /* ============================================================
-   MONTHLY TAB (miles + motion + kWh, combined)
+   MONTHLY TAB (individual units + individual plugs)
    ============================================================ */
 const MONTHLY_FILES = {
   robots: 'data/SG_History_Master.csv',
   kasa:   'data/kasa_energy_history.csv',
 };
 
-const PLUG_ORDER = ['8431','8432','8433','8472','8475','8480','8631','8632','8633'];
+const MONTHLY_UNIT_PALETTE = [
+  '#22d3ee', '#8b5cf6', '#ec4899', '#22c55e', '#f59e0b',
+  '#06b6d4', '#a78bfa', '#f472b6', '#fb923c', '#84cc16',
+  '#60a5fa', '#f43f5e', '#14b8a6', '#eab308', '#c084fc'
+];
+
+const PLUG_ORDER = ['8431','8432','8433','8472','8475','8480','8631','8632','DEVICE_9'];
 const PLUG_COLORS = {
   '8431':'#22d3ee', '8432':'#8b5cf6', '8433':'#ec4899',
   '8472':'#22c55e', '8475':'#f59e0b', '8480':'#06b6d4',
-  '8631':'#a78bfa', '8632':'#f472b6', '8633':'#fb923c',
+  '8631':'#a78bfa', '8632':'#f472b6', 'DEVICE_9':'#fb923c',
 };
 
-let monthlyTotalsChart = null;
 let monthlyMilesChart = null;
 let monthlyMotionChart = null;
+let monthlyUtilByUnitChart = null;
 let monthlyKwhChart = null;
 
 function parseCsvSimple(text){
+  if(typeof parseCsv === 'function') return parseCsv(text);
   if(!text) return [];
   const lines = text.split(/\r?\n/).filter(l => l.length);
   if(!lines.length) return [];
@@ -1678,158 +1685,33 @@ function parseCsvSimple(text){
   return rows;
 }
 
-function hhmmToHours(s){
+function monthlyNumber(value){
+  const n = Number(String(value ?? '').replace(/,/g,'').trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function monthlyHours(value){
+  if(typeof parseHours === 'function') return parseHours(value);
+  const s = String(value ?? '').trim();
   if(!s) return 0;
-  s = String(s).trim();
-  if(!s) return 0;
-  // Accept HH:MM or HH:MM:SS or plain decimal
   if(s.indexOf(':') >= 0){
     const parts = s.split(':');
-    const h = Number(parts[0]) || 0;
-    const m = Number(parts[1]) || 0;
-    const sec = Number(parts[2]) || 0;
-    return h + m/60 + sec/3600;
+    return (Number(parts[0]) || 0) + (Number(parts[1]) || 0) / 60 + (Number(parts[2]) || 0) / 3600;
   }
-  return Number(s) || 0;
+  return monthlyNumber(s);
 }
 
 function ymKey(dateStr){
-  if(!dateStr) return '';
-  // Accept YYYY-MM-DD or any leading YYYY-MM
-  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
-  return m ? (m[1] + '-' + m[2]) : '';
-}
+  const raw = String(dateStr || '').trim();
+  if(!raw) return '';
+  const m = raw.match(/^(\d{4})-(\d{2})/);
+  if(m) return m[1] + '-' + m[2];
 
-async function loadMonthly(){
-  const cacheBuster = '?t=' + Date.now();
-  try {
-    let robotRows = [];
-    let kasaRows = [];
-
-    // Prefer already-normalized robot rows from the main dashboard.
-    // This keeps Monthly using the same source and field mapping as Robots.
-    if (Array.isArray(allRows) && allRows.length) {
-      robotRows = allRows.map(r => ({
-        Date: r.Date,
-        Robot: r.Robot,
-        Miles: Number(r.Miles) || 0,
-        OnHours: Number(r.OnHours) || 0,
-        MotionHours: Number(r.MotionHours) || 0
-      }));
-    } else {
-      // Fallback if Monthly loads before the Robots data is ready.
-      const robotSources = [
-        'data/SG_Merged.csv',
-        'data/SG_2024_Metrics.csv',
-        'data/SG_2024_Metrics.csv.csv',
-        'data/SG_History_Master.csv'
-      ];
-
-      let robotsText = '';
-      for (const src of robotSources) {
-        try {
-          const res = await fetch(src + cacheBuster);
-          if (res.ok) {
-            robotsText = await res.text();
-            break;
-          }
-        } catch (err) {}
-      }
-
-      robotRows = normalizeRows(parseCsv(robotsText), 'monthly').map(r => ({
-        Date: r.Date,
-        Robot: r.Robot,
-        Miles: Number(r.Miles) || 0,
-        OnHours: Number(r.OnHours) || 0,
-        MotionHours: Number(r.MotionHours) || 0
-      }));
-    }
-
-    try {
-      const kasaRes = await fetch(MONTHLY_FILES.kasa + cacheBuster);
-      const kasaText = kasaRes.ok ? await kasaRes.text() : '';
-      kasaRows = parseCsv(kasaText);
-    } catch (err) {
-      kasaRows = [];
-    }
-
-    document.getElementById('monthlyRowsRobots').textContent = robotRows.length;
-    document.getElementById('monthlyRowsKasa').textContent = kasaRows.length;
-
-    // ---- Aggregate robots by month ----
-    const robotByMonth = {}; // ym -> {miles, motion_hours, on_hours, units:Set, active_days:Set}
-    for(const r of robotRows){
-      const ym = ymKey(r.Date);
-      if(!ym) continue;
-      if(!robotByMonth[ym]){
-        robotByMonth[ym] = { miles:0, motion_hours:0, on_hours:0, units:new Set(), active_days:new Set() };
-      }
-      robotByMonth[ym].miles += Number(r.Miles) || 0;
-      robotByMonth[ym].motion_hours += Number(r.MotionHours) || 0;
-      robotByMonth[ym].on_hours += Number(r.OnHours) || 0;
-      if (r.Robot) robotByMonth[ym].units.add(String(r.Robot));
-      if (r.Date) robotByMonth[ym].active_days.add(String(r.Date));
-    }
-
-    // ---- Aggregate Kasa by month, per plug ----
-    // Supports both old Kasa field names and the local collector fields.
-    const kasaByMonth = {}; // ym -> { totals:{plug: kWh}, total: kWh }
-    const hasDelta = kasaRows.length > 0 && Object.prototype.hasOwnProperty.call(kasaRows[0], 'today_kwh_delta');
-
-    const getKasaTimestamp = r => r.timestamp_iso || r.timestamp || r.generated_at || '';
-    const getKasaPlug = r => r.device_name || r.alias || r.name || '';
-    const getTodayKwh = r => parseFloat(r.today_kwh);
-    const getDeltaKwh = r => parseFloat(r.today_kwh_delta);
-
-    if(hasDelta){
-      for(const r of kasaRows){
-        const ym = ymKey(getKasaTimestamp(r));
-        const plug = getKasaPlug(r);
-        const d = getDeltaKwh(r);
-        if(!ym || !plug || isNaN(d)) continue;
-        if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
-        if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
-        kasaByMonth[ym].totals[plug] += d;
-        kasaByMonth[ym].total += d;
-      }
-    } else {
-      // Fallback: group by (plug, day), use max today_kwh - min today_kwh per day.
-      const perPlugDay = {}; // 'plug|YYYY-MM-DD' -> {min, max}
-      for(const r of kasaRows){
-        const ts = getKasaTimestamp(r);
-        const day = String(ts).slice(0,10);
-        const plug = getKasaPlug(r);
-        const v = getTodayKwh(r);
-        if(!day || !plug || isNaN(v)) continue;
-        const k = plug + '|' + day;
-        if(!perPlugDay[k]) perPlugDay[k] = { min:v, max:v };
-        else {
-          if(v < perPlugDay[k].min) perPlugDay[k].min = v;
-          if(v > perPlugDay[k].max) perPlugDay[k].max = v;
-        }
-      }
-      for(const k in perPlugDay){
-        const [plug, day] = k.split('|');
-        const ym = ymKey(day);
-        const used = Math.max(0, perPlugDay[k].max - perPlugDay[k].min);
-        if(!ym) continue;
-        if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
-        if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
-        kasaByMonth[ym].totals[plug] += used;
-        kasaByMonth[ym].total += used;
-      }
-    }
-
-    const months = new Set([
-      ...Object.keys(robotByMonth),
-      ...Object.keys(kasaByMonth),
-    ]);
-    const sortedMonths = Array.from(months).sort();
-
-    renderMonthlyCharts(sortedMonths, robotByMonth, kasaByMonth);
-  } catch(err){
-    console.error('Monthly load failed:', err);
+  const d = new Date(raw);
+  if(!Number.isNaN(d.getTime())){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   }
+  return '';
 }
 
 function fmtMonthLabel(ym){
@@ -1840,203 +1722,315 @@ function fmtMonthLabel(ym){
   return (months[mi] || m) + ' ' + y;
 }
 
-function renderMonthlyCharts(months, robotByMonth, kasaByMonth){
+function getRobotMonthlyRows(rawRows){
+  // Prefer the normalized rows already used by the main dashboard.
+  // This keeps monthly utilization consistent with the Robots tab.
+  if(Array.isArray(allRows) && allRows.length){
+    return allRows.map(r => ({
+      Date: r.Date,
+      Unit: r.Robot,
+      Miles: Number(r.Miles) || 0,
+      OnHours: Number(r.OnHours) || 0,
+      MotionHours: Number(r.MotionHours) || 0
+    }));
+  }
+
+  // Fallback if the monthly tab is loaded before the main robot data is ready.
+  return (normalizeRows(rawRows || [], 'monthly') || []).map(r => ({
+    Date: r.Date,
+    Unit: r.Robot,
+    Miles: Number(r.Miles) || 0,
+    OnHours: Number(r.OnHours) || 0,
+    MotionHours: Number(r.MotionHours) || 0
+  }));
+}
+
+function aggregateRobotsByMonthAndUnit(rows){
+  const byMonthUnit = {};
+  const months = new Set();
+  const units = new Set();
+
+  for(const r of rows || []){
+    const ym = ymKey(r.Date);
+    const unit = String(r.Unit || '').trim();
+    if(!ym || !unit) continue;
+
+    months.add(ym);
+    units.add(unit);
+
+    const key = ym + '|' + unit;
+    if(!byMonthUnit[key]){
+      byMonthUnit[key] = { miles:0, motion:0, on:0 };
+    }
+
+    byMonthUnit[key].miles += Number(r.Miles) || 0;
+    byMonthUnit[key].motion += Number(r.MotionHours) || 0;
+    byMonthUnit[key].on += Number(r.OnHours) || 0;
+  }
+
+  return {
+    months: Array.from(months).sort(),
+    units: Array.from(units).sort((a,b) => String(a).localeCompare(String(b), undefined, {numeric:true})),
+    byMonthUnit
+  };
+}
+
+function aggregateKasaByMonthAndPlug(kasaRows){
+  const kasaByMonth = {};
+  const plugSet = new Set(PLUG_ORDER);
+
+  const first = kasaRows && kasaRows.length ? kasaRows[0] : {};
+  const hasDelta = Object.prototype.hasOwnProperty.call(first, 'today_kwh_delta');
+
+  if(hasDelta){
+    for(const r of kasaRows){
+      const ts = r.timestamp_iso || r.timestamp || '';
+      const ym = ymKey(ts);
+      const plug = r.device_name || r.alias || r.Plug || '';
+      const d = parseFloat(r.today_kwh_delta);
+      if(!ym || !plug || isNaN(d)) continue;
+
+      plugSet.add(plug);
+      if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
+      if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
+      kasaByMonth[ym].totals[plug] += d;
+      kasaByMonth[ym].total += d;
+    }
+  } else {
+    // Fallback for history files that only contain cumulative today_kwh snapshots:
+    // per plug/day usage = max(today_kwh) - min(today_kwh), then summed by month.
+    const perPlugDay = {};
+    for(const r of kasaRows){
+      const ts = r.timestamp_iso || r.timestamp || '';
+      const day = String(ts).slice(0,10);
+      const plug = r.device_name || r.alias || r.Plug || '';
+      const v = parseFloat(r.today_kwh);
+      if(!day || !plug || isNaN(v)) continue;
+
+      plugSet.add(plug);
+      const key = plug + '|' + day;
+      if(!perPlugDay[key]) perPlugDay[key] = { min:v, max:v };
+      else {
+        if(v < perPlugDay[key].min) perPlugDay[key].min = v;
+        if(v > perPlugDay[key].max) perPlugDay[key].max = v;
+      }
+    }
+
+    for(const key in perPlugDay){
+      const [plug, day] = key.split('|');
+      const ym = ymKey(day);
+      const used = Math.max(0, perPlugDay[key].max - perPlugDay[key].min);
+      if(!ym) continue;
+
+      if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
+      if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
+      kasaByMonth[ym].totals[plug] += used;
+      kasaByMonth[ym].total += used;
+    }
+  }
+
+  const plugs = Array.from(plugSet)
+    .filter(Boolean)
+    .sort((a,b) => {
+      const ai = PLUG_ORDER.indexOf(a);
+      const bi = PLUG_ORDER.indexOf(b);
+      if(ai !== -1 || bi !== -1) return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      return String(a).localeCompare(String(b), undefined, {numeric:true});
+    });
+
+  return { kasaByMonth, plugs };
+}
+
+async function loadMonthly(){
+  const cacheBuster = '?t=' + Date.now();
+
+  try {
+    const [robotsRes, kasaRes] = await Promise.all([
+      fetch(MONTHLY_FILES.robots + cacheBuster),
+      fetch(MONTHLY_FILES.kasa + cacheBuster),
+    ]);
+
+    const robotsText = robotsRes.ok ? await robotsRes.text() : '';
+    const kasaText   = kasaRes.ok   ? await kasaRes.text()   : '';
+
+    const rawRobotRows = parseCsvSimple(robotsText);
+    const robotRows = getRobotMonthlyRows(rawRobotRows);
+    const kasaRows  = parseCsvSimple(kasaText);
+
+    document.getElementById('monthlyRowsRobots').textContent = robotRows.length;
+    document.getElementById('monthlyRowsKasa').textContent = kasaRows.length;
+
+    const robotAgg = aggregateRobotsByMonthAndUnit(robotRows);
+    const kasaAgg = aggregateKasaByMonthAndPlug(kasaRows);
+
+    const months = new Set([
+      ...robotAgg.months,
+      ...Object.keys(kasaAgg.kasaByMonth)
+    ]);
+
+    renderMonthlyCharts(Array.from(months).sort(), robotAgg, kasaAgg);
+  } catch(err){
+    console.error('Monthly load failed:', err);
+  }
+}
+
+function individualUnitDataset(unit, metric, idx, months, byMonthUnit){
+  const color = MONTHLY_UNIT_PALETTE[idx % MONTHLY_UNIT_PALETTE.length];
+
+  return {
+    label: unit,
+    data: months.map(month => {
+      const item = byMonthUnit[month + '|' + unit] || { miles:0, motion:0, on:0 };
+      if(metric === 'miles') return +item.miles.toFixed(2);
+      if(metric === 'motion') return +item.motion.toFixed(2);
+      if(metric === 'util') return item.on ? +((item.motion / item.on) * 100).toFixed(1) : 0;
+      return 0;
+    }),
+    backgroundColor: color + 'cc',
+    borderColor: color,
+    borderWidth: 1,
+    borderRadius: 6,
+    stack: metric === 'util' ? undefined : 'units'
+  };
+}
+
+function renderMonthlyCharts(months, robotAgg, kasaAgg){
   const labels = months.map(fmtMonthLabel);
+  const units = robotAgg.units || [];
+  const byMonthUnit = robotAgg.byMonthUnit || {};
 
-  const monthlyMiles = months.map(m => robotByMonth[m] ? robotByMonth[m].miles : 0);
-  const monthlyMotion = months.map(m => robotByMonth[m] ? robotByMonth[m].motion_hours : 0);
-  const monthlyOn = months.map(m => robotByMonth[m] ? robotByMonth[m].on_hours : 0);
-  const monthlyUnits = months.map(m => robotByMonth[m] ? robotByMonth[m].units.size : 0);
-  const monthlyUtil = months.map(m => {
-    const on = robotByMonth[m] ? robotByMonth[m].on_hours : 0;
-    const motion = robotByMonth[m] ? robotByMonth[m].motion_hours : 0;
-    return on ? +(motion / on * 100).toFixed(1) : 0;
-  });
-  const monthlyKwhTotal = months.map(m => kasaByMonth[m] ? kasaByMonth[m].total : 0);
-
-  // ---- Monthly totals chart: units + utilization + core totals ----
-  if(monthlyTotalsChart) monthlyTotalsChart.destroy();
-  monthlyTotalsChart = new Chart(document.getElementById('monthlyTotalsChart'), {
-    data:{
-      labels,
-      datasets:[
-        {
-          type:'bar',
-          label:'Miles',
-          data: monthlyMiles,
-          backgroundColor:'rgba(34,211,238,0.58)',
-          borderColor:'#22d3ee',
-          borderWidth:1.5,
-          borderRadius:8,
-          yAxisID:'y'
-        },
-        {
-          type:'bar',
-          label:'Motion hours',
-          data: monthlyMotion,
-          backgroundColor:'rgba(139,92,246,0.58)',
-          borderColor:'#8b5cf6',
-          borderWidth:1.5,
-          borderRadius:8,
-          yAxisID:'y'
-        },
-        {
-          type:'bar',
-          label:'Energy kWh',
-          data: monthlyKwhTotal,
-          backgroundColor:'rgba(34,197,94,0.46)',
-          borderColor:'#22c55e',
-          borderWidth:1.5,
-          borderRadius:8,
-          yAxisID:'y'
-        },
-        {
-          type:'line',
-          label:'Units',
-          data: monthlyUnits,
-          borderColor:'#f59e0b',
-          backgroundColor:'rgba(245,158,11,0.10)',
-          borderWidth:2.5,
-          pointRadius:4,
-          pointHoverRadius:6,
-          tension:0.2,
-          yAxisID:'y1'
-        },
-        {
-          type:'line',
-          label:'Utilization %',
-          data: monthlyUtil,
-          borderColor:'#f5f7ff',
-          backgroundColor:'rgba(245,247,255,0.08)',
-          borderWidth:2.5,
-          pointRadius:4,
-          pointHoverRadius:6,
-          tension:0.2,
-          yAxisID:'y2'
-        }
-      ],
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:true,labels:{color:'#9aa3b2',boxWidth:12,font:{size:11}}},
-        tooltip:{
-          backgroundColor:'#0a0a0c',
-          borderColor:'#22d3ee',
-          borderWidth:1,
-          callbacks:{
-            label(ctx){
-              const label = ctx.dataset.label || '';
-              const v = Number(ctx.parsed.y || 0);
-              if(label === 'Utilization %') return label + ': ' + v.toFixed(1) + '%';
-              if(label === 'Units') return label + ': ' + v.toFixed(0);
-              if(label === 'Motion hours') return label + ': ' + v.toFixed(1) + 'h';
-              if(label === 'Energy kWh') return label + ': ' + v.toFixed(1) + ' kWh';
-              return label + ': ' + v.toFixed(1);
-            }
-          }
-        },
-      },
-      scales:{
-        x:{ticks:{color:'#9aa3b2'},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{beginAtZero:true,position:'left',ticks:{color:'#9aa3b2'},grid:{color:'rgba(255,255,255,0.04)'}},
-        y1:{beginAtZero:true,position:'right',ticks:{color:'#f59e0b',precision:0},grid:{drawOnChartArea:false}},
-        y2:{beginAtZero:true,position:'right',suggestedMax:100,ticks:{color:'#f5f7ff',callback:v => v + '%'},grid:{drawOnChartArea:false}},
-      },
-    },
-  });
-
-  // ---- Monthly miles ----
+  // Monthly miles by individual unit
   if(monthlyMilesChart) monthlyMilesChart.destroy();
   monthlyMilesChart = new Chart(document.getElementById('monthlyMilesChart'), {
     type:'bar',
     data:{
       labels,
-      datasets:[{
-        label:'Miles',
-        data: monthlyMiles,
-        backgroundColor:'rgba(34,211,238,0.6)',
-        borderColor:'#22d3ee',
-        borderWidth:1.5,
-        borderRadius:8,
-      }],
+      datasets: units.map((unit, idx) => individualUnitDataset(unit, 'miles', idx, months, byMonthUnit))
     },
-    options: commonChartOpts(),
+    options: {
+      ...commonChartOpts(),
+      plugins: {
+        ...commonChartOpts().plugins,
+        legend: { display: true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} }
+      },
+      scales: {
+        x: { stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: { stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true }
+      }
+    }
   });
 
-  // ---- Monthly motion hours ----
+  // Monthly motion hours by individual unit
   if(monthlyMotionChart) monthlyMotionChart.destroy();
   monthlyMotionChart = new Chart(document.getElementById('monthlyMotionChart'), {
     type:'bar',
     data:{
       labels,
-      datasets:[{
-        label:'Motion hours',
-        data: monthlyMotion,
-        backgroundColor:'rgba(139,92,246,0.6)',
-        borderColor:'#8b5cf6',
-        borderWidth:1.5,
-        borderRadius:8,
-      }],
+      datasets: units.map((unit, idx) => individualUnitDataset(unit, 'motion', idx, months, byMonthUnit))
     },
-    options: commonChartOpts(),
+    options: {
+      ...commonChartOpts(),
+      plugins: {
+        ...commonChartOpts().plugins,
+        legend: { display: true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} }
+      },
+      scales: {
+        x: { stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: { stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true }
+      }
+    }
   });
 
-  // ---- Monthly kWh stacked per plug + total line ----
+  // Monthly utilization % by individual unit
+  if(monthlyUtilByUnitChart) monthlyUtilByUnitChart.destroy();
+  monthlyUtilByUnitChart = new Chart(document.getElementById('monthlyUtilByUnitChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets: units.map((unit, idx) => individualUnitDataset(unit, 'util', idx, months, byMonthUnit))
+    },
+    options: {
+      ...commonChartOpts(),
+      plugins: {
+        ...commonChartOpts().plugins,
+        legend: { display: true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} },
+        tooltip: {
+          backgroundColor:'#0a0a0c',
+          borderColor:'#22d3ee',
+          borderWidth:1,
+          callbacks: {
+            label(ctx){
+              return ctx.dataset.label + ': ' + Number(ctx.parsed.y || 0).toFixed(1) + '%';
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked:false, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: {
+          stacked:false,
+          beginAtZero:true,
+          suggestedMax:100,
+          ticks:{color:'#9aa3b2', callback:value => value + '%'},
+          grid:{color:'rgba(255,255,255,0.04)'}
+        }
+      }
+    }
+  });
+
+  // Monthly kWh by individual plug + total line
   if(monthlyKwhChart) monthlyKwhChart.destroy();
 
-  const dynamicPlugs = Array.from(new Set([
-    ...PLUG_ORDER,
-    ...months.flatMap(m => Object.keys((kasaByMonth[m] && kasaByMonth[m].totals) || {}))
-  ])).filter(Boolean);
+  const plugDatasets = (kasaAgg.plugs || []).map((plug, idx) => {
+    const color = PLUG_COLORS[plug] || MONTHLY_UNIT_PALETTE[idx % MONTHLY_UNIT_PALETTE.length];
 
-  const fallbackColors = ['#22d3ee','#8b5cf6','#ec4899','#22c55e','#f59e0b','#06b6d4','#a78bfa','#f472b6','#fb923c','#84cc16','#eab308'];
-
-  const stackedDatasets = dynamicPlugs.map((p, idx) => {
-    const color = PLUG_COLORS[p] || fallbackColors[idx % fallbackColors.length];
     return {
-      type: 'bar',
-      label: p,
-      data: months.map(m => (kasaByMonth[m] && kasaByMonth[m].totals[p]) || 0),
+      type:'bar',
+      label: plug,
+      data: months.map(month => {
+        const item = kasaAgg.kasaByMonth[month];
+        return item && item.totals[plug] ? +item.totals[plug].toFixed(2) : 0;
+      }),
       backgroundColor: color + 'cc',
       borderColor: color,
       borderWidth: 1,
-      stack: 'plugs',
+      stack: 'plugs'
     };
   });
 
   const totalDataset = {
-    type: 'line',
-    label: 'Total',
-    data: monthlyKwhTotal,
-    borderColor: '#f5f7ff',
-    backgroundColor: 'rgba(245,247,255,0.05)',
-    borderWidth: 2.5,
-    pointRadius: 4,
-    pointHoverRadius: 6,
-    fill: false,
-    tension: 0.2,
+    type:'line',
+    label:'Total kWh',
+    data: months.map(month => {
+      const item = kasaAgg.kasaByMonth[month];
+      return item ? +item.total.toFixed(2) : 0;
+    }),
+    borderColor:'#f5f7ff',
+    backgroundColor:'rgba(245,247,255,0.05)',
+    borderWidth:2.5,
+    pointRadius:4,
+    pointHoverRadius:6,
+    fill:false,
+    tension:0.2
   };
 
   monthlyKwhChart = new Chart(document.getElementById('monthlyKwhChart'), {
-    data: {
+    data:{
       labels,
-      datasets: [...stackedDatasets, totalDataset],
+      datasets:[...plugDatasets, totalDataset]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} },
-        tooltip: { backgroundColor:'#0a0a0c', borderColor:'#22d3ee', borderWidth:1 },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} },
+        tooltip:{ backgroundColor:'#0a0a0c', borderColor:'#22d3ee', borderWidth:1 }
       },
-      scales: {
-        x: { stacked: true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
-        y: { stacked: true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true },
-      },
-    },
+      scales:{
+        x:{ stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y:{ stacked:true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true }
+      }
+    }
   });
 }
 </script>
