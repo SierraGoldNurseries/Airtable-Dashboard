@@ -533,18 +533,6 @@ th{
       </div>
     </div>
 
-    <div class="panel">
-      <h3 style="margin-top:0">Monthly totals</h3>
-      <div class="table-wrap" style="max-height:520px">
-        <table>
-          <thead>
-            <tr id="monthlyTableHeadRow"></tr>
-          </thead>
-          <tbody id="monthlyTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-
     <div class="charts3">
       <div class="panel chart-card">
         <h3>Monthly miles</h3>
@@ -1787,7 +1775,6 @@ async function loadMonthly(){
     ]);
     const sortedMonths = Array.from(months).sort();
 
-    renderMonthlyTable(sortedMonths, robotByMonth, kasaByMonth);
     renderMonthlyCharts(sortedMonths, robotByMonth, kasaByMonth);
   } catch(err){
     console.error('Monthly load failed:', err);
@@ -1800,33 +1787,6 @@ function fmtMonthLabel(ym){
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const mi = parseInt(m,10) - 1;
   return (months[mi] || m) + ' ' + y;
-}
-
-function renderMonthlyTable(months, robotByMonth, kasaByMonth){
-  const head = document.getElementById('monthlyTableHeadRow');
-  const body = document.getElementById('monthlyTableBody');
-  // Header
-  const cols = ['Month','Days','Miles','On Hrs','Motion Hrs','Util %','Total kWh', ...PLUG_ORDER.map(p => p + ' kWh')];
-  head.innerHTML = cols.map(c => '<th>' + c + '</th>').join('');
-  // Rows: most recent first
-  const rev = months.slice().reverse();
-  body.innerHTML = '';
-  for(const ym of rev){
-    const r = robotByMonth[ym] || { miles:0, motion_hours:0, on_hours:0, days:new Set() };
-    const k = kasaByMonth[ym] || { totals:{}, total:0 };
-    const util = r.on_hours > 0 ? (r.motion_hours / r.on_hours * 100) : 0;
-    const cells = [
-      '<b>' + fmtMonthLabel(ym) + '</b>',
-      r.days ? r.days.size : 0,
-      fmtNum(r.miles, 1),
-      fmtNum(r.on_hours, 1),
-      fmtNum(r.motion_hours, 1),
-      fmtNum(util, 1) + '%',
-      '<b>' + fmtNum(k.total, 1) + '</b>',
-      ...PLUG_ORDER.map(p => fmtNum(k.totals[p] || 0, 1)),
-    ];
-    body.innerHTML += '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
-  }
 }
 
 function renderMonthlyCharts(months, robotByMonth, kasaByMonth){
