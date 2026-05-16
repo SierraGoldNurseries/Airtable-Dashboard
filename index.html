@@ -355,6 +355,7 @@ th{
   <div class="tabs">
     <button class="tab-btn active" data-tab="robots">Robots</button>
     <button class="tab-btn" data-tab="energy">Energy</button>
+    <button class="tab-btn" data-tab="monthly">Monthly</button>
   </div>
 
   <div id="tab-robots" class="tab-panel active">
@@ -522,6 +523,44 @@ th{
       </div>
     </div>
   </div><!-- /tab-energy -->
+
+  <div id="tab-monthly" class="tab-panel">
+    <div class="panel">
+      <div class="status">
+        <span>Combined view across robots and plugs</span>
+        <span>Miles &amp; motion: <strong id="monthlyRowsRobots">—</strong> rows</span>
+        <span>Energy: <strong id="monthlyRowsKasa">—</strong> rows</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Monthly totals</h3>
+      <div class="table-wrap" style="max-height:520px">
+        <table>
+          <thead>
+            <tr id="monthlyTableHeadRow"></tr>
+          </thead>
+          <tbody id="monthlyTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="charts3">
+      <div class="panel chart-card">
+        <h3>Monthly miles</h3>
+        <canvas id="monthlyMilesChart"></canvas>
+      </div>
+      <div class="panel chart-card">
+        <h3>Monthly motion hours</h3>
+        <canvas id="monthlyMotionChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel chart-card full-width">
+      <h3 style="margin:0 0 8px">Monthly kWh by plug (stacked) + total</h3>
+      <canvas id="monthlyKwhChart"></canvas>
+    </div>
+  </div><!-- /tab-monthly -->
 
 </div>
 
@@ -1345,6 +1384,9 @@ loadData();
       } else if(btn.dataset.tab === 'energy'){
         loadKasa();
       }
+      if(btn.dataset.tab === 'monthly'){
+        loadMonthly();
+      }
     });
   });
 })();
@@ -1607,6 +1649,267 @@ setInterval(() => {
     loadKasa();
   }
 }, 60000);
+
+/* ============================================================
+   MONTHLY TAB (miles + motion + kWh, combined)
+   ============================================================ */
+const MONTHLY_FILES = {
+  robots: 'data/SG_History_Master.csv',
+  kasa:   'data/kasa_energy_history.csv',
+};
+
+const PLUG_ORDER = ['8431','8432','8433','8472','8475','8480','8631','8632','8633'];
+const PLUG_COLORS = {
+  '8431':'#22d3ee', '8432':'#8b5cf6', '8433':'#ec4899',
+  '8472':'#22c55e', '8475':'#f59e0b', '8480':'#06b6d4',
+  '8631':'#a78bfa', '8632':'#f472b6', '8633':'#fb923c',
+};
+
+let monthlyMilesChart = null;
+let monthlyMotionChart = null;
+let monthlyKwhChart = null;
+
+function parseCsvSimple(text){
+  if(!text) return [];
+  const lines = text.split(/\r?\n/).filter(l => l.length);
+  if(!lines.length) return [];
+  const header = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cells = lines[i].split(',');
+    const obj = {};
+    header.forEach((h,idx) => { obj[h] = (cells[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function hhmmToHours(s){
+  if(!s) return 0;
+  s = String(s).trim();
+  if(!s) return 0;
+  // Accept HH:MM or HH:MM:SS or plain decimal
+  if(s.indexOf(':') >= 0){
+    const parts = s.split(':');
+    const h = Number(parts[0]) || 0;
+    const m = Number(parts[1]) || 0;
+    const sec = Number(parts[2]) || 0;
+    return h + m/60 + sec/3600;
+  }
+  return Number(s) || 0;
+}
+
+function ymKey(dateStr){
+  if(!dateStr) return '';
+  // Accept YYYY-MM-DD or any leading YYYY-MM
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
+  return m ? (m[1] + '-' + m[2]) : '';
+}
+
+async function loadMonthly(){
+  const cacheBuster = '?t=' + Date.now();
+  try {
+    const [robotsRes, kasaRes] = await Promise.all([
+      fetch(MONTHLY_FILES.robots + cacheBuster),
+      fetch(MONTHLY_FILES.kasa + cacheBuster),
+    ]);
+    const robotsText = robotsRes.ok ? await robotsRes.text() : '';
+    const kasaText   = kasaRes.ok   ? await kasaRes.text()   : '';
+    const robotRows = parseCsvSimple(robotsText);
+    const kasaRows  = parseCsvSimple(kasaText);
+
+    document.getElementById('monthlyRowsRobots').textContent = robotRows.length;
+    document.getElementById('monthlyRowsKasa').textContent = kasaRows.length;
+
+    // ---- Aggregate robots by month ----
+    const robotByMonth = {}; // ym -> {miles, motion_hours, on_hours, days:Set}
+    for(const r of robotRows){
+      const ym = ymKey(r.Date);
+      if(!ym) continue;
+      if(!robotByMonth[ym]){
+        robotByMonth[ym] = { miles:0, motion_hours:0, on_hours:0, days:new Set() };
+      }
+      robotByMonth[ym].miles += Number(r['Miles Traveled during day']) || 0;
+      robotByMonth[ym].motion_hours += hhmmToHours(r['Robot Time In Motion During Day']);
+      robotByMonth[ym].on_hours += hhmmToHours(r['Robot Time On During Day']);
+      robotByMonth[ym].days.add(r.Date);
+    }
+
+    // ---- Aggregate Kasa by month, per plug ----
+    // Strategy: use today_kwh_delta column if present (correct sum), else fall back
+    // to (max today_kwh - min today_kwh) per (plug, day) summed across the month.
+    const kasaByMonth = {}; // ym -> { totals:{plug: kWh}, total: kWh }
+    const hasDelta = kasaRows.length > 0 && 'today_kwh_delta' in kasaRows[0];
+
+    if(hasDelta){
+      for(const r of kasaRows){
+        const ym = ymKey(r.timestamp_iso);
+        const plug = r.device_name || r.alias;
+        const d = parseFloat(r.today_kwh_delta);
+        if(!ym || !plug || isNaN(d)) continue;
+        if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
+        if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
+        kasaByMonth[ym].totals[plug] += d;
+        kasaByMonth[ym].total += d;
+      }
+    } else {
+      // Fallback: group by (plug, day), use peak - min today_kwh as the day's usage
+      const perPlugDay = {}; // 'plug|YYYY-MM-DD' -> {min, max}
+      for(const r of kasaRows){
+        const ts = r.timestamp_iso || '';
+        const day = ts.slice(0,10);
+        const plug = r.device_name || r.alias;
+        const v = parseFloat(r.today_kwh);
+        if(!day || !plug || isNaN(v)) continue;
+        const k = plug + '|' + day;
+        if(!perPlugDay[k]) perPlugDay[k] = { min:v, max:v };
+        else {
+          if(v < perPlugDay[k].min) perPlugDay[k].min = v;
+          if(v > perPlugDay[k].max) perPlugDay[k].max = v;
+        }
+      }
+      for(const k in perPlugDay){
+        const [plug, day] = k.split('|');
+        const ym = ymKey(day);
+        const used = Math.max(0, perPlugDay[k].max - perPlugDay[k].min);
+        if(!ym) continue;
+        if(!kasaByMonth[ym]) kasaByMonth[ym] = { totals:{}, total:0 };
+        if(!kasaByMonth[ym].totals[plug]) kasaByMonth[ym].totals[plug] = 0;
+        kasaByMonth[ym].totals[plug] += used;
+        kasaByMonth[ym].total += used;
+      }
+    }
+
+    // ---- Combined month list ----
+    const months = new Set([
+      ...Object.keys(robotByMonth),
+      ...Object.keys(kasaByMonth),
+    ]);
+    const sortedMonths = Array.from(months).sort();
+
+    renderMonthlyTable(sortedMonths, robotByMonth, kasaByMonth);
+    renderMonthlyCharts(sortedMonths, robotByMonth, kasaByMonth);
+  } catch(err){
+    console.error('Monthly load failed:', err);
+  }
+}
+
+function fmtMonthLabel(ym){
+  if(!ym) return '—';
+  const [y,m] = ym.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mi = parseInt(m,10) - 1;
+  return (months[mi] || m) + ' ' + y;
+}
+
+function renderMonthlyTable(months, robotByMonth, kasaByMonth){
+  const head = document.getElementById('monthlyTableHeadRow');
+  const body = document.getElementById('monthlyTableBody');
+  // Header
+  const cols = ['Month','Days','Miles','On Hrs','Motion Hrs','Util %','Total kWh', ...PLUG_ORDER.map(p => p + ' kWh')];
+  head.innerHTML = cols.map(c => '<th>' + c + '</th>').join('');
+  // Rows: most recent first
+  const rev = months.slice().reverse();
+  body.innerHTML = '';
+  for(const ym of rev){
+    const r = robotByMonth[ym] || { miles:0, motion_hours:0, on_hours:0, days:new Set() };
+    const k = kasaByMonth[ym] || { totals:{}, total:0 };
+    const util = r.on_hours > 0 ? (r.motion_hours / r.on_hours * 100) : 0;
+    const cells = [
+      '<b>' + fmtMonthLabel(ym) + '</b>',
+      r.days ? r.days.size : 0,
+      fmtNum(r.miles, 1),
+      fmtNum(r.on_hours, 1),
+      fmtNum(r.motion_hours, 1),
+      fmtNum(util, 1) + '%',
+      '<b>' + fmtNum(k.total, 1) + '</b>',
+      ...PLUG_ORDER.map(p => fmtNum(k.totals[p] || 0, 1)),
+    ];
+    body.innerHTML += '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+  }
+}
+
+function renderMonthlyCharts(months, robotByMonth, kasaByMonth){
+  const labels = months.map(fmtMonthLabel);
+
+  // ---- Monthly miles ----
+  if(monthlyMilesChart) monthlyMilesChart.destroy();
+  monthlyMilesChart = new Chart(document.getElementById('monthlyMilesChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Miles',
+        data: months.map(m => robotByMonth[m] ? robotByMonth[m].miles : 0),
+        backgroundColor:'rgba(34,211,238,0.6)',
+        borderColor:'#22d3ee',
+        borderWidth:1.5,
+        borderRadius:8,
+      }],
+    },
+    options: commonChartOpts(),
+  });
+
+  // ---- Monthly motion hours ----
+  if(monthlyMotionChart) monthlyMotionChart.destroy();
+  monthlyMotionChart = new Chart(document.getElementById('monthlyMotionChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Motion hours',
+        data: months.map(m => robotByMonth[m] ? robotByMonth[m].motion_hours : 0),
+        backgroundColor:'rgba(139,92,246,0.6)',
+        borderColor:'#8b5cf6',
+        borderWidth:1.5,
+        borderRadius:8,
+      }],
+    },
+    options: commonChartOpts(),
+  });
+
+  // ---- Monthly kWh stacked per plug + total line ----
+  if(monthlyKwhChart) monthlyKwhChart.destroy();
+  const stackedDatasets = PLUG_ORDER.map(p => ({
+    type: 'bar',
+    label: p,
+    data: months.map(m => (kasaByMonth[m] && kasaByMonth[m].totals[p]) || 0),
+    backgroundColor: PLUG_COLORS[p] + 'cc',
+    borderColor: PLUG_COLORS[p],
+    borderWidth: 1,
+    stack: 'plugs',
+  }));
+  const totalDataset = {
+    type: 'line',
+    label: 'Total',
+    data: months.map(m => kasaByMonth[m] ? kasaByMonth[m].total : 0),
+    borderColor: '#f5f7ff',
+    backgroundColor: 'rgba(245,247,255,0.05)',
+    borderWidth: 2.5,
+    pointRadius: 4,
+    pointHoverRadius: 6,
+    fill: false,
+    tension: 0.2,
+  };
+  monthlyKwhChart = new Chart(document.getElementById('monthlyKwhChart'), {
+    data: {
+      labels,
+      datasets: [...stackedDatasets, totalDataset],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels:{color:'#9aa3b2', boxWidth:12, font:{size:11}} },
+        tooltip: { backgroundColor:'#0a0a0c', borderColor:'#22d3ee', borderWidth:1 },
+      },
+      scales: {
+        x: { stacked: true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+        y: { stacked: true, ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true },
+      },
+    },
+  });
+}
 </script>
 
 </body>
