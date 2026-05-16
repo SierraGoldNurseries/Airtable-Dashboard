@@ -166,6 +166,166 @@ th{
   .kpis{grid-template-columns:1fr}
   h1{font-size:24px}
 }
+
+/* ---- Tabs ---- */
+.tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.tab-btn{
+  background:transparent;
+  border:none;
+  color:var(--muted);
+  padding:12px 22px;
+  font-weight:700;
+  font-size:14px;
+  cursor:pointer;
+  border-bottom:3px solid transparent;
+  border-radius:0;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  transition:color .15s,border-color .15s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{
+  color:var(--text);
+  border-bottom-color:var(--cyan);
+}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ---- Kasa-specific ---- */
+.kasa-kpis{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:12px;
+  margin:14px 0;
+}
+.kasa-kpi{
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  padding:16px;
+  background:linear-gradient(180deg,rgba(22,22,25,.96),rgba(10,10,12,.98));
+  box-shadow:var(--shadow);
+  min-height:118px;
+}
+.kasa-kpi::before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:4px;
+  background:linear-gradient(90deg,var(--green),var(--yellow),var(--pink));
+}
+.plug-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+  margin-bottom:14px;
+}
+.plug-card{
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  padding:14px 16px;
+  background:linear-gradient(180deg,rgba(22,22,25,.96),rgba(10,10,12,.98));
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+.plug-card.idle{opacity:.55}
+.plug-card .plug-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  margin-bottom:10px;
+}
+.plug-name{font-size:18px;font-weight:900;letter-spacing:-.02em}
+.plug-state{
+  font-size:11px;
+  font-weight:700;
+  padding:3px 9px;
+  border-radius:999px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.plug-state.on{background:rgba(34,197,94,.18);color:#86efac}
+.plug-state.off{background:rgba(239,68,68,.18);color:#fca5a5}
+.plug-watts{
+  font-size:26px;
+  font-weight:900;
+  letter-spacing:-.03em;
+  margin:6px 0 2px;
+}
+.plug-watts.live{
+  background:linear-gradient(135deg,#22d3ee,#8b5cf6);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.plug-meta{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px 14px;
+  margin-top:8px;
+  color:var(--muted);
+  font-size:12px;
+}
+.plug-meta b{color:var(--text);font-weight:700}
+.energy-bar-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:6px 0;
+  font-size:13px;
+}
+.energy-bar-label{
+  flex:0 0 70px;
+  font-weight:700;
+}
+.energy-bar-track{
+  flex:1;
+  height:18px;
+  background:rgba(255,255,255,.05);
+  border-radius:8px;
+  overflow:hidden;
+  position:relative;
+}
+.energy-bar-fill{
+  height:100%;
+  background:linear-gradient(90deg,var(--green),var(--yellow),var(--pink));
+  border-radius:8px;
+  transition:width .4s ease;
+}
+.energy-bar-val{
+  flex:0 0 95px;
+  text-align:right;
+  font-variant-numeric:tabular-nums;
+  color:var(--muted);
+  font-size:12px;
+}
+.energy-bar-val b{color:var(--text)}
+.range-toggle{display:flex;gap:6px;margin-bottom:10px}
+.range-toggle button{
+  padding:7px 14px;
+  font-size:12px;
+  background:linear-gradient(180deg,#17171b,#111114);
+}
+.range-toggle button.active{
+  background:linear-gradient(135deg,#06b6d4,#8b5cf6);
+}
+@media (max-width:1280px){
+  .kasa-kpis{grid-template-columns:repeat(2,1fr)}
+  .plug-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:700px){
+  .kasa-kpis{grid-template-columns:1fr}
+  .plug-grid{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -192,6 +352,12 @@ th{
     </div>
   </div>
 
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="robots">Robots</button>
+    <button class="tab-btn" data-tab="energy">Energy</button>
+  </div>
+
+  <div id="tab-robots" class="tab-panel active">
   <div class="panel">
     <div class="status">
       <span>Last Updated: <strong id="lastUpdated">—</strong></span>
@@ -273,6 +439,90 @@ th{
       </table>
     </div>
   </div>
+  </div><!-- /tab-robots -->
+
+  <div id="tab-energy" class="tab-panel">
+    <div class="panel">
+      <div class="status">
+        <span>Energy data: <strong id="kasaLastUpdated">—</strong></span>
+        <span>Collector host: <strong id="kasaHost">—</strong></span>
+        <span>Plugs reporting: <strong id="kasaCount">—</strong></span>
+      </div>
+    </div>
+
+    <div class="kasa-kpis">
+      <div class="kasa-kpi">
+        <div class="label">Live Total Load</div>
+        <div class="value" id="kpiLiveW">—</div>
+        <div class="foot">Sum of current watts across all plugs</div>
+      </div>
+      <div class="kasa-kpi">
+        <div class="label">Today's Total</div>
+        <div class="value" id="kpiTodayKwh">—</div>
+        <div class="foot" id="kpiTodaySub">kWh since midnight</div>
+      </div>
+      <div class="kasa-kpi">
+        <div class="label">Month To Date</div>
+        <div class="value" id="kpiMonthKwh">—</div>
+        <div class="foot">kWh this month, all plugs</div>
+      </div>
+      <div class="kasa-kpi">
+        <div class="label">Active Plugs</div>
+        <div class="value" id="kpiActive">—</div>
+        <div class="foot" id="kpiActiveSub">of total</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Live plug status</h3>
+      <div id="plugGrid" class="plug-grid"></div>
+    </div>
+
+    <div class="charts2">
+      <div class="panel chart-card">
+        <h3>Today's kWh per plug</h3>
+        <canvas id="kasaTodayChart"></canvas>
+      </div>
+      <div class="panel chart-card">
+        <h3>Month-to-date kWh per plug</h3>
+        <canvas id="kasaMonthChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel chart-card full-width">
+      <h3 style="margin:0 0 8px">
+        Total load trend
+        <span class="range-toggle" style="display:inline-flex;margin-left:14px;vertical-align:middle">
+          <button class="range-btn active" data-range="24h">24h</button>
+          <button class="range-btn" data-range="7d">7d</button>
+          <button class="range-btn" data-range="30d">30d</button>
+        </span>
+      </h3>
+      <canvas id="kasaTrendChart"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">Plug leaderboard (today)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Plug</th>
+              <th>State</th>
+              <th>Live W</th>
+              <th>Today kWh</th>
+              <th>Month kWh</th>
+              <th>Voltage</th>
+              <th>Amps</th>
+              <th>Signal</th>
+            </tr>
+          </thead>
+          <tbody id="kasaLeaderboardBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div><!-- /tab-energy -->
+
 </div>
 
 <script>
@@ -1059,7 +1309,293 @@ function openDebug() {
     '<div class="panel"><table><thead><tr>' +
     headers.map(h => "<th>" + h + "</th>").join("") +
     '</tr></thead><tbody>' + table + '</tbody></table></div>' +
-    '</body></html>'
+    '
+
+<script>
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
+(function(){
+  const tabs = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const target = document.getElementById('tab-' + btn.dataset.tab);
+      if(target) target.classList.add('active');
+      if(btn.dataset.tab === 'energy' && !window.__kasaLoaded){
+        window.__kasaLoaded = true;
+        loadKasa();
+      } else if(btn.dataset.tab === 'energy'){
+        loadKasa();
+      }
+    });
+  });
+})();
+
+/* ============================================================
+   KASA ENERGY DASHBOARD
+   ============================================================ */
+const KASA_FILES = {
+  latest: 'data/kasa_energy_latest.json',
+  history: 'data/kasa_energy_history.csv',
+};
+
+let kasaTodayChart = null;
+let kasaMonthChart = null;
+let kasaTrendChart = null;
+let kasaHistoryCache = null;
+let kasaCurrentRange = '24h';
+
+async function loadKasa(){
+  const cacheBuster = '?t=' + Date.now();
+  try {
+    const [latestRes, histRes] = await Promise.all([
+      fetch(KASA_FILES.latest + cacheBuster),
+      fetch(KASA_FILES.history + cacheBuster),
+    ]);
+    if(!latestRes.ok) throw new Error('No latest JSON');
+    const latest = await latestRes.json();
+    const histText = histRes.ok ? await histRes.text() : '';
+    kasaHistoryCache = parseKasaCsv(histText);
+    renderKasaHeader(latest);
+    renderKasaKpis(latest);
+    renderPlugGrid(latest);
+    renderKasaCharts(latest);
+    renderKasaLeaderboard(latest);
+    renderKasaTrend(kasaCurrentRange);
+  } catch(err){
+    console.error('Kasa load failed:', err);
+    document.getElementById('kasaLastUpdated').textContent = 'failed: ' + err.message;
+  }
+}
+
+function parseKasaCsv(text){
+  if(!text) return [];
+  const lines = text.split(/\r?\n/).filter(l => l.length);
+  if(!lines.length) return [];
+  const header = lines[0].split(',');
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cells = lines[i].split(',');
+    if(cells.length < header.length - 3) continue;
+    const obj = {};
+    header.forEach((h,idx) => { obj[h] = (cells[idx] || '').trim(); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function fmtNum(n, digits){
+  if(n === null || n === undefined || n === '' || isNaN(n)) return '—';
+  return Number(n).toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits});
+}
+
+function renderKasaHeader(latest){
+  document.getElementById('kasaLastUpdated').textContent = latest.timestamp_iso || '—';
+  document.getElementById('kasaHost').textContent = latest.pc_host || '—';
+  document.getElementById('kasaCount').textContent = (latest.devices || []).length;
+}
+
+function renderKasaKpis(latest){
+  const totals = latest.totals || {};
+  const devices = latest.devices || [];
+  document.getElementById('kpiLiveW').textContent = fmtNum(totals.current_power_w, 0) + ' W';
+  document.getElementById('kpiTodayKwh').textContent = fmtNum(totals.today_kwh, 2) + ' kWh';
+  document.getElementById('kpiMonthKwh').textContent = fmtNum(totals.month_kwh, 1) + ' kWh';
+  const activeCount = devices.filter(d => Number(d.current_power_w) > 5).length;
+  document.getElementById('kpiActive').textContent = activeCount;
+  document.getElementById('kpiActiveSub').textContent = 'of ' + devices.length + ' plugs (>5W)';
+}
+
+function renderPlugGrid(latest){
+  const devices = (latest.devices || []).slice().sort((a,b) =>
+    String(a.device_name).localeCompare(String(b.device_name)));
+  const grid = document.getElementById('plugGrid');
+  grid.innerHTML = '';
+  devices.forEach(d => {
+    const watts = Number(d.current_power_w) || 0;
+    const idle = watts <= 5;
+    const card = document.createElement('div');
+    card.className = 'plug-card' + (idle ? ' idle' : '');
+    const stateClass = String(d.on).toLowerCase() === 'true' ? 'on' : 'off';
+    const stateText = String(d.on).toLowerCase() === 'true' ? 'ON' : 'OFF';
+    card.innerHTML = `
+      <div class="plug-head">
+        <div class="plug-name">${d.device_name || '—'}</div>
+        <div class="plug-state ${stateClass}">${stateText}</div>
+      </div>
+      <div class="plug-watts ${idle ? '' : 'live'}">${fmtNum(watts, 1)} W</div>
+      <div class="plug-meta">
+        <span>Today <b>${fmtNum(d.today_kwh, 2)}</b> kWh</span>
+        <span>Month <b>${fmtNum(d.month_kwh, 1)}</b> kWh</span>
+        <span>Volt <b>${fmtNum(d.voltage_v, 1)}</b> V</span>
+        <span>Amps <b>${fmtNum(d.current_a, 2)}</b> A</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function commonChartOpts(){
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor:'#0a0a0c', borderColor:'#22d3ee', borderWidth:1 },
+    },
+    scales: {
+      x: { ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'} },
+      y: { ticks:{color:'#9aa3b2'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true },
+    },
+  };
+}
+
+function renderKasaCharts(latest){
+  const devices = (latest.devices || []).slice().sort((a,b) =>
+    String(a.device_name).localeCompare(String(b.device_name)));
+  const labels = devices.map(d => d.device_name);
+
+  const todayData = devices.map(d => Number(d.today_kwh) || 0);
+  const monthData = devices.map(d => Number(d.month_kwh) || 0);
+
+  const todayCtx = document.getElementById('kasaTodayChart');
+  const monthCtx = document.getElementById('kasaMonthChart');
+
+  if(kasaTodayChart) kasaTodayChart.destroy();
+  if(kasaMonthChart) kasaMonthChart.destroy();
+
+  kasaTodayChart = new Chart(todayCtx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'kWh today',
+        data: todayData,
+        backgroundColor:'rgba(34,211,238,0.6)',
+        borderColor:'#22d3ee',
+        borderWidth:1.5,
+        borderRadius:8,
+      }],
+    },
+    options: commonChartOpts(),
+  });
+
+  kasaMonthChart = new Chart(monthCtx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'kWh month',
+        data: monthData,
+        backgroundColor:'rgba(139,92,246,0.6)',
+        borderColor:'#8b5cf6',
+        borderWidth:1.5,
+        borderRadius:8,
+      }],
+    },
+    options: commonChartOpts(),
+  });
+}
+
+function renderKasaLeaderboard(latest){
+  const devices = (latest.devices || []).slice().sort((a,b) =>
+    (Number(b.current_power_w)||0) - (Number(a.current_power_w)||0));
+  const tbody = document.getElementById('kasaLeaderboardBody');
+  tbody.innerHTML = '';
+  devices.forEach(d => {
+    const tr = document.createElement('tr');
+    const stateText = String(d.on).toLowerCase() === 'true' ? 'ON' : 'OFF';
+    const stateClass = String(d.on).toLowerCase() === 'true' ? 'on' : 'off';
+    tr.innerHTML = `
+      <td><b>${d.device_name || '—'}</b></td>
+      <td><span class="plug-state ${stateClass}">${stateText}</span></td>
+      <td>${fmtNum(d.current_power_w, 1)}</td>
+      <td>${fmtNum(d.today_kwh, 2)}</td>
+      <td>${fmtNum(d.month_kwh, 1)}</td>
+      <td>${fmtNum(d.voltage_v, 1)}</td>
+      <td>${fmtNum(d.current_a, 2)}</td>
+      <td>${d.rssi || '—'} dBm</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderKasaTrend(range){
+  if(!kasaHistoryCache || !kasaHistoryCache.length){
+    return;
+  }
+  const now = new Date();
+  let cutoff;
+  if(range === '24h') cutoff = new Date(now.getTime() - 24*3600*1000);
+  else if(range === '7d') cutoff = new Date(now.getTime() - 7*24*3600*1000);
+  else cutoff = new Date(now.getTime() - 30*24*3600*1000);
+
+  // Group by timestamp, sum current_power_w
+  const byTs = {};
+  for(const row of kasaHistoryCache){
+    const ts = row.timestamp_iso;
+    if(!ts) continue;
+    const d = new Date(ts);
+    if(isNaN(d) || d < cutoff) continue;
+    const w = Number(row.current_power_w);
+    if(isNaN(w)) continue;
+    if(!byTs[ts]) byTs[ts] = 0;
+    byTs[ts] += w;
+  }
+  const sortedTs = Object.keys(byTs).sort();
+  const labels = sortedTs.map(ts => {
+    const d = new Date(ts);
+    if(range === '24h') return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' +
+           d.toLocaleTimeString([], {hour:'2-digit'});
+  });
+  const data = sortedTs.map(ts => byTs[ts]);
+
+  if(kasaTrendChart) kasaTrendChart.destroy();
+  const ctx = document.getElementById('kasaTrendChart');
+  kasaTrendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        label:'Total watts',
+        data,
+        borderColor:'#22d3ee',
+        backgroundColor:'rgba(34,211,238,0.12)',
+        borderWidth:2,
+        fill:true,
+        tension:0.25,
+        pointRadius:0,
+        pointHoverRadius:4,
+      }],
+    },
+    options: commonChartOpts(),
+  });
+}
+
+document.querySelectorAll('.range-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    kasaCurrentRange = btn.dataset.range;
+    renderKasaTrend(kasaCurrentRange);
+  });
+});
+
+// Auto-refresh energy every 60 seconds when the tab is visible
+setInterval(() => {
+  const energyTab = document.getElementById('tab-energy');
+  if(energyTab && energyTab.classList.contains('active')){
+    loadKasa();
+  }
+}, 60000);
+</script>
+
+</body></html>'
   );
 
   w.document.close();
