@@ -2163,6 +2163,10 @@ Date,Location,Robot,Item,Version,Robot Time On During Day,Robot Time In Motion D
 2026-05-20,sierra-gold,8480,117132,,8:41,2:21,6,0.270633,Sierra Gold.csv
 2026-05-20,sierra-gold,8631,117143,,8:12,1:32,4.2,0.186992,Sierra Gold.csv
 2026-05-20,sierra-gold,8632,117136,,7:50,1:32,4.1,0.195745,Sierra Gold.csv
-2026-05-21,sierra-gold,8472,117331,,0:09,0:01,0,0.111111,Sierra Gold.csv
-2026-05-21,sierra-gold,8475,117332,,0:08,0:00,0,0,Sierra Gold.csv
-2026-05-21,sierra-gold,8480,117333,,0:08,0:00,0,0,Sierra Gold.csv
+2026-05-21,sierra-gold,8431,117336,,1:52,0:34,1.4,0.303571,Sierra Gold.csv
+2026-05-21,sierra-gold,8432,117337,,1:52,0:26,1.1,0.232143,Sierra Gold.csv
+2026-05-21,sierra-gold,8472,117331,,2:09,0:59,2.7,0.457364,Sierra Gold.csv
+2026-05-21,sierra-gold,8475,117332,,2:08,0:52,2.4,0.40625,Sierra Gold.csv
+2026-05-21,sierra-gold,8480,117333,,2:08,0:52,2.3,0.40625,Sierra Gold.csv
+2026-05-21,sierra-gold,8631,117339,,1:51,0:25,1.1,0.225225,Sierra Gold.csv
+2026-05-21,sierra-gold,8632,117340,,1:51,0:03,0.1,0.027027,Sierra Gold.csv
