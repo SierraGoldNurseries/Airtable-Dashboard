@@ -116,6 +116,8 @@ def parse_date_flexible(date_raw) -> Optional[datetime]:
         "%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d", "%m-%d-%Y", "%m-%d-%y",
         "%Y/%m/%d", "%m/%d/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S",
         "%m/%d/%Y %I:%M:%S %p", "%m/%d/%Y %I:%M %p",
+        "%B %d, %Y", "%b %d, %Y", "%B %d %Y", "%b %d %Y",   # "July 2, 2026" / "Jul 2 2026"
+        "%d %B %Y", "%d %b %Y",                              # "2 July 2026"
     ]:
         try:
             return datetime.strptime(value, fmt)
