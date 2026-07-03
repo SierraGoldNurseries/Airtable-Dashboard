@@ -439,6 +439,19 @@ def click_visible(locator) -> bool:
     return False
 
 
+def looks_like_expected_csv(body: bytes) -> bool:
+    """A real Sierra Gold export: not HTML, and its header row names Date + Robot.
+    This rejects the marketing/SPA HTML page that Airtable sometimes serves on a
+    'csv'-ish link (which still contains commas and used to slip through)."""
+    if not body:
+        return False
+    head = body[:4000].decode("utf-8", errors="ignore").lstrip("\ufeff").lstrip()
+    if head[:1] == "<" or "<html" in head[:200].lower() or "<!doctype" in head[:200].lower():
+        return False
+    first_line = head.splitlines()[0].lower() if head.splitlines() else ""
+    return ("," in first_line) and ("date" in first_line) and ("robot" in first_line)
+
+
 def try_direct_csv_url(page) -> Optional[bytes]:
     anchors = page.locator("a[href]")
     count = min(anchors.count(), 500)
@@ -450,8 +463,11 @@ def try_direct_csv_url(page) -> Optional[bytes]:
                 response = page.request.get(href)
                 if response.ok:
                     body = response.body()
-                    if body and b"," in body[:1000]:
+                    # Only accept if it's genuinely the expected CSV — not an HTML page.
+                    if looks_like_expected_csv(body):
                         return body
+                    else:
+                        print(f"[harvest] skipped csv-ish link (not a valid CSV header): {href[:120]}")
         except Exception:
             pass
     return None
@@ -708,9 +724,30 @@ def main() -> int:
         if not csv_path.exists():
             raise RuntimeError(f"Download completed but file was not saved: {csv_path}")
 
+        try:
+            _lines = csv_path.read_bytes()[:400].decode("utf-8", errors="ignore").splitlines()
+            print(f"[harvest] downloaded {suggested_filename}: header={_lines[0] if _lines else '(empty)'}")
+        except Exception:
+            pass
+
         latest_rows = read_csv_file(csv_path, default_source=suggested_filename)
         if not latest_rows:
-            raise RuntimeError("Latest Airtable CSV downloaded but no usable rows were parsed.")
+            # Diagnostics: show exactly what we downloaded so the failure is debuggable from the log.
+            try:
+                raw = csv_path.read_bytes()
+                print("[harvest] DOWNLOAD DIAGNOSTICS ------------------------------------")
+                print(f"[harvest] file={suggested_filename} bytes={len(raw)}")
+                print("[harvest] first 800 chars:")
+                print(raw[:800].decode("utf-8", errors="ignore"))
+                with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+                    rdr = csv.reader(f)
+                    hdr = next(rdr, [])
+                    print(f"[harvest] parsed header ({len(hdr)} cols): {hdr}")
+                    print(f"[harvest] first data row: {next(rdr, [])}")
+                print("[harvest] --------------------------------------------------------")
+            except Exception as diag_exc:
+                print(f"[harvest] diagnostics failed: {diag_exc}")
+            raise RuntimeError("Latest Airtable CSV downloaded but no usable rows were parsed. See DOWNLOAD DIAGNOSTICS above for the header/content we received.")
 
         snapshot_path = save_raw_snapshot(csv_path)
         shutil.copyfile(csv_path, LATEST_CSV)
