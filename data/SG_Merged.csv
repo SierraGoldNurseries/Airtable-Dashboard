@@ -2800,3 +2800,11 @@ Item,Date,Location,Robot,Version,Miles,OnHours,MotionHours,Utilization,Source
 132745,2026-09-01,sierra-gold,8631,,4.2,8.616667,1.6,0.185687,Sierra Gold.csv
 132776,2026-09-01,sierra-gold,8632,,6.9,8.133333,2.116667,0.260246,Sierra Gold.csv
 132746,2026-09-01,sierra-gold,8633,,3.8,8.516667,1.483333,0.174168,Sierra Gold.csv
+132994,2026-09-02,sierra-gold,8431,,0.3,0.866667,0.116667,0.134615,Sierra Gold.csv
+132995,2026-09-02,sierra-gold,8432,,0.7,0.866667,0.2,0.230769,Sierra Gold.csv
+132977,2026-09-02,sierra-gold,8472,,0.6,1.15,0.216667,0.188406,Sierra Gold.csv
+132978,2026-09-02,sierra-gold,8475,,0.5,1.15,0.2,0.173913,Sierra Gold.csv
+132979,2026-09-02,sierra-gold,8480,,0.9,1.133333,0.316667,0.279412,Sierra Gold.csv
+132980,2026-09-02,sierra-gold,8631,,0.5,1.133333,0.183333,0.161765,Sierra Gold.csv
+132996,2026-09-02,sierra-gold,8632,,0.2,0.85,0.1,0.117647,Sierra Gold.csv
+132981,2026-09-02,sierra-gold,8633,,0,1.133333,0,0,Sierra Gold.csv
