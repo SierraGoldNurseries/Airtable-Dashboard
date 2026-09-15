@@ -1,15 +1,15 @@
 {
   "ok": true,
   "mode": "github online harvest + strict monthly locking",
-  "last_success": "2026-09-15 07:04:33 UTC",
-  "last_attempt": "2026-09-15 07:04:33 UTC",
+  "last_success": "2026-09-15 09:03:21 UTC",
+  "last_attempt": "2026-09-15 09:03:21 UTC",
   "last_error": null,
   "range_start": "2024-08-12",
   "range_end": "2026-09-14",
   "row_count": 2873,
   "changed": false,
   "download_filename": "Sierra Gold.csv",
-  "download_seconds": 68.9,
+  "download_seconds": 67.56,
   "latest_dates": [
     "2026-08-28",
     "2026-08-29",
