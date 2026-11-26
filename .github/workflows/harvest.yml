@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   harvest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Show trigger info
         run: |
